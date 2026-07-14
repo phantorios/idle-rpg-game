@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Idle RPG Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#1a1626;
+    --panel:#241f33;
+    --panel2:#2e2842;
+    --line:#3d3556;
+    --gold:#f5c542;
+    --hp:#e5484d;
+    --hp-bg:#4a2030;
+    --xp:#7dd87d;
+    --text:#e8e3f2;
+    --dim:#9c93b8;
+    --accent:#8e6ff0;
+    --boss:#ff6b4a;
+    --font-display:'Pixelify Sans',system-ui,sans-serif;
+    --font-num:'IBM Plex Mono',monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-display);
+    display:flex;justify-content:center;
+    overflow:hidden;
+    user-select:none;-webkit-user-select:none;
+  }
+  #game{
+    width:100%;max-width:430px;height:100dvh;
+    display:flex;flex-direction:column;
+    background:
+      radial-gradient(ellipse 120% 50% at 50% -10%, #35284f 0%, transparent 60%),
+      var(--bg);
+  }
+
+  /* ---------- top bar ---------- */
+  #topbar{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:10px 14px 6px;
+  }
+  .stat{display:flex;align-items:center;gap:6px;font-family:var(--font-num);font-size:15px;font-weight:600}
+  .stat .icon{font-size:16px}
+  #gold-val{color:var(--gold)}
+  #stage-label{font-family:var(--font-display);font-weight:700;font-size:16px;letter-spacing:.5px}
+  #kills{font-family:var(--font-num);font-size:12px;color:var(--dim);text-align:center;margin-top:2px}
+
+  /* ---------- monster arena ---------- */
+  #arena{
+    flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    position:relative;min-height:0;
+  }
+  #monster-name{font-size:18px;font-weight:600;letter-spacing:.5px;margin-bottom:6px}
+  #monster-name .boss-tag{color:var(--boss);font-weight:700}
+  #hpbar{
+    width:70%;max-width:280px;height:16px;border:2px solid var(--line);border-radius:8px;
+    background:var(--hp-bg);overflow:hidden;margin-bottom:4px;
+  }
+  #hpfill{height:100%;width:100%;background:linear-gradient(180deg,#ff6d72,var(--hp));transition:width .08s}
+  #hptext{font-family:var(--font-num);font-size:12px;color:var(--dim);margin-bottom:10px}
+  #boss-timer{font-family:var(--font-num);font-size:15px;font-weight:600;color:var(--boss);height:20px;margin-bottom:4px}
+
+  #sprite{
+    font-size:96px;line-height:1;cursor:pointer;
+    transition:transform .06s;
+    filter:drop-shadow(0 10px 18px rgba(0,0,0,.5));
+  }
+  #sprite.squash{transform:scale(.88) rotate(-4deg)}
+  #sprite.boss-size{font-size:120px}
+  #sprite.dead{transform:scale(0);opacity:0;transition:transform .18s,opacity .18s}
+
+  .float-dmg{
+    position:absolute;font-family:var(--font-num);font-weight:600;font-size:20px;
+    pointer-events:none;animation:floatUp .7s ease-out forwards;color:#fff;
+    text-shadow:0 2px 4px rgba(0,0,0,.6);
+  }
+  .float-dmg.crit{color:var(--gold);font-size:26px}
+  .float-gold{
+    position:absolute;font-family:var(--font-num);font-weight:600;font-size:15px;color:var(--gold);
+    pointer-events:none;animation:floatUp .9s ease-out forwards;
+  }
+  @keyframes floatUp{
+    0%{opacity:1;transform:translateY(0)}
+    100%{opacity:0;transform:translateY(-70px)}
+  }
+
+  #dps-readout{font-family:var(--font-num);font-size:12px;color:var(--dim);margin-top:12px}
+
+  /* ---------- upgrades ---------- */
+  #upgrades{
+    background:var(--panel);border-top:2px solid var(--line);
+    padding:10px 12px calc(10px + env(safe-area-inset-bottom));
+    display:flex;flex-direction:column;gap:8px;
+  }
+  .up-row{
+    display:flex;align-items:center;gap:10px;
+    background:var(--panel2);border:1px solid var(--line);border-radius:10px;
+    padding:8px 10px;
+  }
+  .up-icon{font-size:26px;width:34px;text-align:center}
+  .up-info{flex:1;min-width:0}
+  .up-name{font-size:14px;font-weight:600}
+  .up-desc{font-family:var(--font-num);font-size:11px;color:var(--dim)}
+  .up-btn{
+    font-family:var(--font-num);font-size:12px;font-weight:600;
+    background:var(--accent);color:#fff;border:none;border-radius:8px;
+    padding:8px 10px;min-width:86px;cursor:pointer;text-align:center;
+  }
+  .up-btn:disabled{background:#453d63;color:#7d739c;cursor:default}
+  .up-btn .lvl{display:block;font-size:10px;font-weight:400;opacity:.85}
+
+  /* ---------- tuning panel ---------- */
+  #tune-toggle{
+    position:absolute;top:10px;right:10px;z-index:5;
+    font-family:var(--font-num);font-size:11px;color:var(--dim);
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:5px 9px;cursor:pointer;
+  }
+  #tuner{
+    position:absolute;inset:0;z-index:10;background:rgba(20,16,32,.96);
+    display:none;flex-direction:column;padding:20px 18px;overflow-y:auto;
+  }
+  #tuner.open{display:flex}
+  #tuner h2{font-size:20px;margin-bottom:4px}
+  #tuner p{font-family:var(--font-num);font-size:11px;color:var(--dim);margin-bottom:16px}
+  .tune-row{margin-bottom:14px}
+  .tune-row label{display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px}
+  .tune-row label span{font-family:var(--font-num);color:var(--gold)}
+  .tune-row input[type=range]{width:100%;accent-color:var(--accent)}
+  .tune-note{font-family:var(--font-num);font-size:10px;color:var(--dim);margin-top:2px}
+  #tuner .btns{display:flex;gap:10px;margin-top:8px}
+  #tuner button{
+    flex:1;font-family:var(--font-display);font-size:15px;font-weight:600;
+    border:none;border-radius:10px;padding:12px;cursor:pointer;
+  }
+  #apply-btn{background:var(--accent);color:#fff}
+  #reset-btn{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+
+  #toast{
+    position:absolute;left:50%;top:18%;transform:translateX(-50%);
+    background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    padding:10px 16px;font-size:15px;font-weight:600;opacity:0;pointer-events:none;
+    transition:opacity .3s;z-index:8;white-space:nowrap;
+  }
+  #toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="topbar">
+    <div class="stat"><span class="icon">🪙</span><span id="gold-val">0</span></div>
+    <div id="stage-label">Stage 1</div>
+  </div>
+  <div id="kills">0 / 10</div>
+
+  <div id="arena">
+    <button id="tune-toggle">⚙ tune</button>
+    <div id="boss-timer"></div>
+    <div id="monster-name">Slime</div>
+    <div id="hpbar"><div id="hpfill"></div></div>
+    <div id="hptext">10 / 10</div>
+    <div id="sprite">🟢</div>
+    <div id="dps-readout">Tap: 1 · DPS: 0</div>
+    <div id="toast"></div>
+
+    <!-- tuning overlay -->
+    <div id="tuner">
+      <h2>Balance tuner</h2>
+      <p>These are the numbers you'd hard-code in Godot. Tweak, apply, and feel the difference. Applying restarts the run.</p>
+      <div class="tune-row">
+        <label>Monster HP growth / stage <span id="v-hpGrowth"></span></label>
+        <input type="range" id="t-hpGrowth" min="1.1" max="2.0" step="0.05">
+        <div class="tune-note">Tap Titans uses ~1.55–1.6. Higher = walls come sooner.</div>
+      </div>
+      <div class="tune-row">
+        <label>Gold per kill growth / stage <span id="v-goldGrowth"></span></label>
+        <input type="range" id="t-goldGrowth" min="1.05" max="1.9" step="0.05">
+        <div class="tune-note">Keep below HP growth or the game never slows down.</div>
+      </div>
+      <div class="tune-row">
+        <label>Upgrade cost growth / level <span id="v-costGrowth"></span></label>
+        <input type="range" id="t-costGrowth" min="1.05" max="1.5" step="0.01">
+        <div class="tune-note">Genre standard is 1.15 (Cookie Clicker, AdVenture Capitalist).</div>
+      </div>
+      <div class="tune-row">
+        <label>Boss HP multiplier <span id="v-bossMult"></span></label>
+        <input type="range" id="t-bossMult" min="2" max="15" step="0.5">
+      </div>
+      <div class="tune-row">
+        <label>Boss timer (seconds) <span id="v-bossTime"></span></label>
+        <input type="range" id="t-bossTime" min="10" max="60" step="5">
+      </div>
+      <div class="btns">
+        <button id="reset-btn">Defaults</button>
+        <button id="apply-btn">Apply & restart</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="upgrades">
+    <div class="up-row">
+      <div class="up-icon">👆</div>
+      <div class="up-info">
+        <div class="up-name">Tap Damage</div>
+        <div class="up-desc" id="tap-desc">+1 per tap</div>
+      </div>
+      <button class="up-btn" id="buy-tap"></button>
+    </div>
+    <div class="up-row">
+      <div class="up-icon">⚔️</div>
+      <div class="up-info">
+        <div class="up-name">Swordsman</div>
+        <div class="up-desc" id="sword-desc">Auto-attacks: 2 DPS each level</div>
+      </div>
+      <button class="up-btn" id="buy-sword"></button>
+    </div>
+    <div class="up-row">
+      <div class="up-icon">🧙</div>
+      <div class="up-info">
+        <div class="up-name">Mage</div>
+        <div class="up-desc" id="mage-desc">Heavy DPS. Unlocks the idle dream.</div>
+      </div>
+      <button class="up-btn" id="buy-mage"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// BALANCE CONSTANTS — this object is what you'd port to Godot
+// ============================================================
+const DEFAULTS = {
+  baseHp: 10,          // stage 1 monster HP
+  hpGrowth: 1.55,      // HP multiplier per stage
+  baseGold: 3,         // gold per kill at stage 1
+  goldGrowth: 1.4,     // gold multiplier per stage
+  killsPerStage: 10,   // kills before the boss appears
+  bossMult: 6,         // boss HP = monster HP * this
+  bossTime: 30,        // seconds to kill the boss
+  bossGoldMult: 8,     // boss pays this x normal gold
+  tapBase: 1,          // damage added per Tap Damage level
+  tapCost: 10, costGrowth: 1.15,
+  swordDps: 2,  swordCost: 50,
+  mageDps: 25,  mageCost: 1000,
+  critChance: 0.08, critMult: 4,
+};
+let C = {...DEFAULTS};
+
+// ---------------- state ----------------
+let S;
+function freshState(){
+  return {
+    gold: 0, stage: 1, kills: 0,
+    tapLvl: 1, swordLvl: 0, mageLvl: 0,
+    isBoss: false, bossDeadline: 0,
+    hp: 0, maxHp: 0,
+  };
+}
+
+// ---------------- derived values ----------------
+const monsterHp  = st => C.baseHp * Math.pow(C.hpGrowth, st-1);
+const killGold   = st => C.baseGold * Math.pow(C.goldGrowth, st-1);
+const tapDamage  = () => C.tapBase * S.tapLvl;
+const totalDps   = () => S.swordLvl*C.swordDps + S.mageLvl*C.mageDps;
+const upCost = (base, lvl) => Math.ceil(base * Math.pow(C.costGrowth, lvl));
+
+// ---------------- big number formatting ----------------
+const SUF = ['','K','M','B','T','aa','ab','ac','ad'];
+function fmt(n){
+  if(n < 1000) return Math.floor(n).toString();
+  let i = 0;
+  while(n >= 1000 && i < SUF.length-1){ n /= 1000; i++; }
+  return (n >= 100 ? n.toFixed(0) : n.toFixed(1)) + SUF[i];
+}
+
+// ---------------- monsters per stage ----------------
+const MOBS = [
+  ['Slime','🟢'],['Bat','🦇'],['Rat','🐀'],['Spider','🕷️'],['Snake','🐍'],
+  ['Wolf','🐺'],['Goblin','👺'],['Skeleton','💀'],['Ghost','👻'],['Orc','👹'],
+  ['Golem','🗿'],['Wyvern','🐉'],['Demon','😈'],['Kraken','🐙'],['Titan','🦖'],
+];
+const BOSSES = [['Slime King','🫧'],['Vampire Lord','🧛'],['Lich','☠️'],['Dragon','🐲'],['Void God','🌑']];
+function mobFor(stage, boss){
+  const list = boss ? BOSSES : MOBS;
+  return list[(stage-1) % list.length];
+}
+
+// ---------------- DOM ----------------
+const $ = id => document.getElementById(id);
+const el = {
+  gold:$('gold-val'), stage:$('stage-label'), kills:$('kills'),
+  name:$('monster-name'), fill:$('hpfill'), hptext:$('hptext'),
+  sprite:$('sprite'), dps:$('dps-readout'), timer:$('boss-timer'),
+  arena:$('arena'), toast:$('toast'),
+  buyTap:$('buy-tap'), buySword:$('buy-sword'), buyMage:$('buy-mage'),
+};
+
+// ---------------- spawn / kill ----------------
+function spawn(boss=false){
+  S.isBoss = boss;
+  S.maxHp = monsterHp(S.stage) * (boss ? C.bossMult : 1);
+  S.hp = S.maxHp;
+  if(boss) S.bossDeadline = performance.now() + C.bossTime*1000;
+  const [nm, emo] = mobFor(S.stage, boss);
+  el.name.innerHTML = boss ? `<span class="boss-tag">⚠ BOSS</span> ${nm}` : nm;
+  el.sprite.textContent = emo;
+  el.sprite.classList.toggle('boss-size', boss);
+  el.sprite.classList.remove('dead');
+  render();
+}
+
+function damage(amount, x, y, fromTap){
+  if(S.hp <= 0) return;
+  let crit = false;
+  if(fromTap && Math.random() < C.critChance){ amount *= C.critMult; crit = true; }
+  S.hp -= amount;
+  if(fromTap) floatText(fmt(amount), x, y, crit ? 'float-dmg crit' : 'float-dmg');
+  if(S.hp <= 0) kill();
+  render();
+}
+
+function kill(){
+  const g = killGold(S.stage) * (S.isBoss ? C.bossGoldMult : 1);
+  S.gold += g;
+  floatText('+'+fmt(g)+' 🪙', 50, 30, 'float-gold');
+  el.sprite.classList.add('dead');
+
+  if(S.isBoss){
+    S.stage++; S.kills = 0;
+    toast(`Stage ${S.stage} reached!`);
+    setTimeout(()=>spawn(false), 250);
+  } else {
+    S.kills++;
+    if(S.kills >= C.killsPerStage){
+      setTimeout(()=>spawn(true), 250);
+    } else {
+      setTimeout(()=>spawn(false), 250);
+    }
+  }
+}
+
+function bossFail(){
+  toast('Boss escaped! Keep farming, come back stronger.');
+  S.kills = C.killsPerStage - 1; // one kill re-summons the boss
+  spawn(false);
+}
+
+// ---------------- tap ----------------
+el.sprite.addEventListener('pointerdown', e=>{
+  el.sprite.classList.add('squash');
+  setTimeout(()=>el.sprite.classList.remove('squash'), 70);
+  const r = el.arena.getBoundingClientRect();
+  const x = ((e.clientX - r.left)/r.width)*100 + (Math.random()*10-5);
+  const y = ((e.clientY - r.top)/r.height)*100 - 8;
+  damage(tapDamage(), x, y, true);
+});
+
+// ---------------- upgrades ----------------
+function tryBuy(kind){
+  const cfg = {
+    tap:   {lvl:'tapLvl',   base:C.tapCost},
+    sword: {lvl:'swordLvl', base:C.swordCost},
+    mage:  {lvl:'mageLvl',  base:C.mageCost},
+  }[kind];
+  const lvl = S[cfg.lvl] - (kind==='tap'?1:0);
+  const cost = upCost(cfg.base, lvl);
+  if(S.gold < cost) return;
+  S.gold -= cost;
+  S[cfg.lvl]++;
+  render();
+}
+el.buyTap.onclick  = ()=>tryBuy('tap');
+el.buySword.onclick= ()=>tryBuy('sword');
+el.buyMage.onclick = ()=>tryBuy('mage');
+
+// ---------------- game loop (idle DPS + boss timer) ----------------
+let last = performance.now();
+function tick(now){
+  const dt = (now - last)/1000; last = now;
+  const dps = totalDps();
+  if(dps > 0 && S.hp > 0) damage(dps*dt, 0, 0, false);
+  if(S.isBoss && S.hp > 0){
+    const remain = (S.bossDeadline - now)/1000;
+    el.timer.textContent = '⏳ ' + Math.max(0,remain).toFixed(1) + 's';
+    if(remain <= 0) bossFail();
+  } else {
+    el.timer.textContent = '';
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---------------- render ----------------
+function render(){
+  el.gold.textContent = fmt(S.gold);
+  el.stage.textContent = 'Stage ' + S.stage;
+  el.kills.textContent = S.isBoss ? 'BOSS FIGHT' : `${S.kills} / ${C.killsPerStage}`;
+  el.fill.style.width = Math.max(0, S.hp/S.maxHp*100) + '%';
+  el.hptext.textContent = fmt(Math.max(0,S.hp)) + ' / ' + fmt(S.maxHp);
+  el.dps.textContent = `Tap: ${fmt(tapDamage())} · DPS: ${fmt(totalDps())}`;
+
+  const btn = (b, cost, lvl, canAfford)=>{
+    b.innerHTML = `🪙 ${fmt(cost)}<span class="lvl">Lv ${lvl}</span>`;
+    b.disabled = !canAfford;
+  };
+  const tc = upCost(C.tapCost,  S.tapLvl-1);
+  const sc = upCost(C.swordCost,S.swordLvl);
+  const mc = upCost(C.mageCost, S.mageLvl);
+  btn(el.buyTap,  tc, S.tapLvl,   S.gold>=tc);
+  btn(el.buySword,sc, S.swordLvl, S.gold>=sc);
+  btn(el.buyMage, mc, S.mageLvl,  S.gold>=mc);
+}
+
+// ---------------- fx ----------------
+function floatText(txt, xPct, yPct, cls){
+  const d = document.createElement('div');
+  d.className = cls;
+  d.textContent = txt;
+  d.style.left = (xPct||50) + '%';
+  d.style.top = (yPct||40) + '%';
+  el.arena.appendChild(d);
+  setTimeout(()=>d.remove(), 950);
+}
+let toastTimer;
+function toast(msg){
+  el.toast.textContent = msg;
+  el.toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.toast.classList.remove('show'), 2200);
+}
+
+// ---------------- tuning panel ----------------
+const tuner = $('tuner');
+$('tune-toggle').onclick = ()=>{ syncTuner(); tuner.classList.add('open'); };
+const T = {
+  hpGrowth:  ['t-hpGrowth','v-hpGrowth'],
+  goldGrowth:['t-goldGrowth','v-goldGrowth'],
+  costGrowth:['t-costGrowth','v-costGrowth'],
+  bossMult:  ['t-bossMult','v-bossMult'],
+  bossTime:  ['t-bossTime','v-bossTime'],
+};
+function syncTuner(){
+  for(const k in T){
+    $(T[k][0]).value = C[k];
+    $(T[k][1]).textContent = C[k];
+  }
+}
+for(const k in T){
+  $(T[k][0]).addEventListener('input', e=>{ $(T[k][1]).textContent = e.target.value; });
+}
+$('reset-btn').onclick = ()=>{ C = {...DEFAULTS}; syncTuner(); };
+$('apply-btn').onclick = ()=>{
+  for(const k in T) C[k] = parseFloat($(T[k][0]).value);
+  tuner.classList.remove('open');
+  S = freshState();
+  spawn(false);
+  toast('New balance applied — fresh run');
+};
+
+// ---------------- boot ----------------
+S = freshState();
+spawn(false);
+render();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
